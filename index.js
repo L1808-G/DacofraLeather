@@ -8,9 +8,9 @@ app.use(express.json());
 // conexión a MongoDB
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("🧠 Conectado a MongoDB"))
-    .catch(err => console.log(err));
+    .catch(err => console.log("❌ Error Mongo:", err));
 
-// modelo mejorado
+// modelo
 const userSchema = new mongoose.Schema({
     numero: String,
     historial: [
@@ -27,58 +27,64 @@ const User = mongoose.model("User", userSchema);
 // endpoint principal
 app.post('/mensaje', async (req, res) => {
     try {
-        console.log("BODY:", req.body);
+        console.log("📩 BODY:", req.body);
 
-        const numero = req.body.numero || req.body.from || "desconocido";
+        const numero = req.body.numero || req.body.from;
         const mensaje = req.body.mensaje || req.body.body;
+        const respuestaIA = req.body.respuesta;
 
-        if (!mensaje) {
-            return res.json({ respuesta: "No entendí el mensaje" });
+        if (!numero) {
+            return res.json({ error: "Número no recibido" });
         }
 
         let usuario = await User.findOne({ numero });
 
-        // 🧠 detectar si es nuevo
-        let esNuevo = false;
-
         if (!usuario) {
             usuario = new User({ numero, historial: [] });
-            esNuevo = true;
         }
 
-        // 🔥 guardar mensaje del usuario
-        usuario.historial.push({
-            role: "user",
-            content: mensaje
-        });
+        // 🟢 HTTP 1 → mensaje del usuario
+        if (mensaje) {
 
-        // 🧠 lógica de respuesta
-        let respuesta;
+            // guardar mensaje usuario
+            usuario.historial.push({
+                role: "user",
+                content: mensaje
+            });
 
-        if (esNuevo) {
-            respuesta = "Hola 👋, soy Erick, asesor de ventas. ¿Con quién tengo el gusto?";
-        } else {
-            // tomar últimos mensajes para contexto (máx 5)
-            const ultimos = usuario.historial.slice(-5)
-                .map(m => m.content)
-                .join(" | ");
+            await usuario.save();
 
-            respuesta = `Perfecto, seguimos 👍`;
+            // tomar últimos mensajes (máx 6)
+            const ultimos = usuario.historial.slice(-6);
+
+            const contexto = ultimos
+                .map(m => `${m.role === "user" ? "Usuario" : "Bot"}: ${m.content}`)
+                .join("\n");
+
+            return res.json({
+                contexto,
+                mensaje
+            });
         }
 
-        // 🔥 guardar respuesta del bot
-        usuario.historial.push({
-            role: "bot",
-            content: respuesta
-        });
+        // 🔵 HTTP 2 → respuesta de la IA
+        if (respuestaIA) {
 
-        await usuario.save();
+            usuario.historial.push({
+                role: "bot",
+                content: respuestaIA
+            });
 
-        return res.json({ respuesta });
+            await usuario.save();
+
+            return res.json({ ok: true });
+        }
+
+        return res.json({ error: "Sin datos válidos" });
 
     } catch (error) {
-        console.log("ERROR REAL:", error);
-        res.json({ respuesta: "Error interno" });
+        console.log("❌ ERROR REAL:", error);
+        return res.json({ error: "Error interno" });
     }
 });
 
