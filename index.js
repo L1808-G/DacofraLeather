@@ -3,28 +3,34 @@ const express = require('express');
 const mongoose = require('mongoose');
 
 const app = express();
-app.use(express.json()); // 👈 IMPORTANTE para recibir JSON
+app.use(express.json());
 
 // conexión a MongoDB
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("🧠 Conectado a MongoDB"))
     .catch(err => console.log(err));
 
-// modelo
+// modelo mejorado
 const userSchema = new mongoose.Schema({
     numero: String,
-    historial: [String]
+    historial: [
+        {
+            role: String,   // "user" o "bot"
+            content: String,
+            fecha: { type: Date, default: Date.now }
+        }
+    ]
 });
 
 const User = mongoose.model("User", userSchema);
 
-// endpoint
-app.post('/mensaje', async(req, res) => {
+// endpoint principal
+app.post('/mensaje', async (req, res) => {
     try {
         console.log("BODY:", req.body);
 
-        const numero = req.body.numero || req.body.user || "desconocido";
-        const mensaje = req.body.mensaje || req.body.message || req.body.text;
+        const numero = req.body.numero || req.body.from || "desconocido";
+        const mensaje = req.body.mensaje || req.body.body;
 
         if (!mensaje) {
             return res.json({ respuesta: "No entendí el mensaje" });
@@ -32,16 +38,43 @@ app.post('/mensaje', async(req, res) => {
 
         let usuario = await User.findOne({ numero });
 
+        // 🧠 detectar si es nuevo
+        let esNuevo = false;
+
         if (!usuario) {
             usuario = new User({ numero, historial: [] });
+            esNuevo = true;
         }
 
-        usuario.historial.push(mensaje);
+        // 🔥 guardar mensaje del usuario
+        usuario.historial.push({
+            role: "user",
+            content: mensaje
+        });
+
+        // 🧠 lógica de respuesta
+        let respuesta;
+
+        if (esNuevo) {
+            respuesta = "Hola 👋, soy Erick, asesor de ventas. ¿Con quién tengo el gusto?";
+        } else {
+            // tomar últimos mensajes para contexto (máx 5)
+            const ultimos = usuario.historial.slice(-5)
+                .map(m => m.content)
+                .join(" | ");
+
+            respuesta = `Perfecto, seguimos 👍 (${ultimos})`;
+        }
+
+        // 🔥 guardar respuesta del bot
+        usuario.historial.push({
+            role: "bot",
+            content: respuesta
+        });
+
         await usuario.save();
 
-        res.json({
-            respuesta: `Recuerdo: ${usuario.historial.join(", ")}`
-        });
+        return res.json({ respuesta });
 
     } catch (error) {
         console.log("ERROR REAL:", error);
