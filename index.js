@@ -43,10 +43,12 @@ app.post('/mensaje', async (req, res) => {
             usuario = new User({ numero, historial: [] });
         }
 
-        // 🟢 HTTP 1 → mensaje del usuario
+        // ================================
+        // 🟢 HTTP 1 → MENSAJE DEL USUARIO
+        // ================================
         if (mensaje) {
 
-            // guardar mensaje usuario
+            // guardar mensaje del usuario
             usuario.historial.push({
                 role: "user",
                 content: mensaje
@@ -54,20 +56,28 @@ app.post('/mensaje', async (req, res) => {
 
             await usuario.save();
 
-            // tomar últimos mensajes (máx 6)
-            const ultimos = usuario.historial.slice(-6);
+            // construir contexto SIEMPRE válido
+            let contexto = "";
 
-            const contexto = ultimos
-                .map(m => `${m.role === "user" ? "Usuario" : "Bot"}: ${m.content}`)
-                .join("\n");
+            if (usuario.historial.length > 0) {
+                const ultimos = usuario.historial.slice(-6);
 
+                contexto = ultimos
+                    .map(m => `${m.role === "user" ? "Cliente" : "Asesor"}: ${m.content}`)
+                    .join("\n");
+            } else {
+                contexto = "Sin conversación previa";
+            }
+
+            // 🔥 IMPORTANTE: usar "response" para BuilderBot
             return res.json({
-                contexto,
-                mensaje
+                response: `CONTEXTO:\n${contexto}\n\nMENSAJE:\n${mensaje}`
             });
         }
 
-        // 🔵 HTTP 2 → respuesta de la IA
+        // ================================
+        // 🔵 HTTP 2 → RESPUESTA DE LA IA
+        // ================================
         if (respuestaIA) {
 
             usuario.historial.push({
