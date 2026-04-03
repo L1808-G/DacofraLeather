@@ -63,7 +63,7 @@ app.post('/mensaje', async (req, res) => {
                 .map(m => m.content)
                 .join(" | ");
 
-            respuesta = `Perfecto, seguimos 👍 (${ultimos})`;
+            respuesta = `Perfecto, seguimos 👍`;
         }
 
         // 🔥 guardar respuesta del bot
