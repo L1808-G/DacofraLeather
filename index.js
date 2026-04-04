@@ -69,7 +69,7 @@ app.post('/mensaje', async (req, res) => {
 
             // 🔥 CLAVE: FORZAR A LA IA A USAR MEMORIA
             return res.json({
-                response: `
+                text: `
 Eres Erick, asesor de ventas.
 
 Tienes memoria de la conversación y DEBES usarla.
