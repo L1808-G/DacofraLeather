@@ -34,7 +34,7 @@ app.post('/mensaje', async (req, res) => {
         const respuestaIA = req.body.respuesta;
 
         if (!numero) {
-            return res.json({ error: "Número no recibido" });
+            return res.send("Error: número no recibido");
         }
 
         let usuario = await User.findOne({ numero });
@@ -56,7 +56,7 @@ app.post('/mensaje', async (req, res) => {
 
             await usuario.save();
 
-            // tomar últimos mensajes (máx 8 para mejor contexto)
+            // tomar últimos mensajes
             const ultimos = usuario.historial.slice(-8);
 
             let contexto = ultimos
@@ -67,9 +67,8 @@ app.post('/mensaje', async (req, res) => {
                 contexto = "Sin conversación previa";
             }
 
-            // 🔥 CLAVE: FORZAR A LA IA A USAR MEMORIA
-            return res.json({
-                text: `
+            // 🔥 RESPUESTA EN TEXTO PLANO (CLAVE)
+            return res.send(`
 Eres Erick, asesor de ventas.
 
 Tienes memoria de la conversación y DEBES usarla.
@@ -84,9 +83,8 @@ INSTRUCCIONES:
 - Usa el historial para responder
 - NO digas que no tienes información si sí la hay
 - NO repitas preguntas ya respondidas
-- Responde de forma natural, como si ya conocieras al cliente
-`
-            });
+- Responde natural, sin sonar robot
+`);
         }
 
         // ================================
@@ -101,14 +99,14 @@ INSTRUCCIONES:
 
             await usuario.save();
 
-            return res.json({ ok: true });
+            return res.send("ok");
         }
 
-        return res.json({ error: "Sin datos válidos" });
+        return res.send("Sin datos válidos");
 
     } catch (error) {
         console.log("❌ ERROR REAL:", error);
-        return res.json({ error: "Error interno" });
+        return res.send("Error interno");
     }
 });
 
