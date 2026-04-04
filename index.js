@@ -24,14 +24,23 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
+// 🧼 limpiar número (MUY IMPORTANTE)
+function limpiarNumero(numero) {
+    if (!numero) return "desconocido";
+    return numero.toString().replace(/[^\d]/g, "");
+}
+
 // endpoint principal
 app.post('/mensaje', async (req, res) => {
     try {
         console.log("📩 BODY:", req.body);
 
-        const numero = req.body.numero || req.body.from;
+        // 🔥 normalizar datos
+        let numero = req.body.numero || req.body.from;
         const mensaje = req.body.mensaje || req.body.body;
         const respuestaIA = req.body.respuesta;
+
+        numero = limpiarNumero(numero);
 
         if (!numero) {
             return res.send("Error: número no recibido");
@@ -56,34 +65,37 @@ app.post('/mensaje', async (req, res) => {
 
             await usuario.save();
 
-            // tomar últimos mensajes
-            const ultimos = usuario.historial.slice(-8);
+            // 🧠 tomar últimos mensajes (contexto real)
+            const ultimos = usuario.historial.slice(-10);
 
             let contexto = ultimos
                 .map(m => `${m.role === "user" ? "Cliente" : "Asesor"}: ${m.content}`)
                 .join("\n");
 
-            if (!contexto) {
-                contexto = "Sin conversación previa";
+            // fallback real
+            if (!contexto || contexto.trim() === "") {
+                contexto = "Cliente: Hola";
             }
 
-            // 🔥 RESPUESTA EN TEXTO PLANO (CLAVE)
+            // 🔥 RESPUESTA LIMPIA PARA IA
             return res.send(`
-Eres Erick, asesor de ventas.
+Eres Erick, asesor de ventas de productos de cuero premium.
 
-Tienes memoria de la conversación y DEBES usarla.
+Hablas natural, cercano y profesional.
 
-Historial:
-${contexto}
-
-Mensaje actual del cliente:
-${mensaje}
-
-INSTRUCCIONES:
-- Usa el historial para responder
-- NO digas que no tienes información si sí la hay
+IMPORTANTE:
+- Tienes memoria de la conversación
 - NO repitas preguntas ya respondidas
-- Responde natural, sin sonar robot
+- NO digas que no tienes información si sí la hay
+- Responde como si ya conocieras al cliente
+
+---------------------
+HISTORIAL:
+${contexto}
+---------------------
+
+MENSAJE ACTUAL:
+${mensaje}
 `);
         }
 
@@ -92,12 +104,15 @@ INSTRUCCIONES:
         // ================================
         if (respuestaIA) {
 
-            usuario.historial.push({
-                role: "bot",
-                content: respuestaIA
-            });
+            // 🔥 evitar guardar basura
+            if (respuestaIA && respuestaIA.trim() !== "") {
+                usuario.historial.push({
+                    role: "bot",
+                    content: respuestaIA
+                });
 
-            await usuario.save();
+                await usuario.save();
+            }
 
             return res.send("ok");
         }
