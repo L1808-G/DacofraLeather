@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema({
     numero: String,
     historial: [
         {
-            role: String,   // "user" o "bot"
+            role: String,
             content: String,
             fecha: { type: Date, default: Date.now }
         }
@@ -56,22 +56,36 @@ app.post('/mensaje', async (req, res) => {
 
             await usuario.save();
 
-            // construir contexto SIEMPRE válido
-            let contexto = "";
+            // tomar últimos mensajes (máx 8 para mejor contexto)
+            const ultimos = usuario.historial.slice(-8);
 
-            if (usuario.historial.length > 0) {
-                const ultimos = usuario.historial.slice(-6);
+            let contexto = ultimos
+                .map(m => `${m.role === "user" ? "Cliente" : "Asesor"}: ${m.content}`)
+                .join("\n");
 
-                contexto = ultimos
-                    .map(m => `${m.role === "user" ? "Cliente" : "Asesor"}: ${m.content}`)
-                    .join("\n");
-            } else {
+            if (!contexto) {
                 contexto = "Sin conversación previa";
             }
 
-            // 🔥 IMPORTANTE: usar "response" para BuilderBot
+            // 🔥 CLAVE: FORZAR A LA IA A USAR MEMORIA
             return res.json({
-                response: `CONTEXTO:\n${contexto}\n\nMENSAJE:\n${mensaje}`
+                response: `
+Eres Erick, asesor de ventas.
+
+Tienes memoria de la conversación y DEBES usarla.
+
+Historial:
+${contexto}
+
+Mensaje actual del cliente:
+${mensaje}
+
+INSTRUCCIONES:
+- Usa el historial para responder
+- NO digas que no tienes información si sí la hay
+- NO repitas preguntas ya respondidas
+- Responde de forma natural, como si ya conocieras al cliente
+`
             });
         }
 
