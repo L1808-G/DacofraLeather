@@ -24,13 +24,13 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
-// 🧼 limpiar número
+// limpiar número
 function limpiarNumero(numero) {
     if (!numero) return "desconocido";
     return numero.toString().replace(/[^\d]/g, "");
 }
 
-// endpoint principal
+// endpoint
 app.post('/mensaje', async (req, res) => {
     try {
         console.log("📩 BODY:", req.body);
@@ -56,7 +56,7 @@ app.post('/mensaje', async (req, res) => {
         // ================================
         if (mensaje) {
 
-            // guardar mensaje del usuario
+            // guardar mensaje usuario
             usuario.historial.push({
                 role: "user",
                 content: mensaje
@@ -64,30 +64,23 @@ app.post('/mensaje', async (req, res) => {
 
             await usuario.save();
 
-            // 🧠 construir historial como TEXTO
-            const ultimos = usuario.historial.slice(-10);
+            // 🔥 construir history en formato que BuilderBot entiende
+            const history = usuario.historial.slice(-10).map(m => ({
+                role: m.role,
+                content: m.content
+            }));
 
-            let historialTexto = ultimos
-                .map(m => `${m.role === "user" ? "Cliente" : "Asesor"}: ${m.content}`)
-                .join("\n");
-
-            if (!historialTexto || historialTexto.trim() === "") {
-                historialTexto = "Cliente: Hola";
-            }
-
-            // 🔥 devolver JSON (NO texto plano)
             return res.json({
-                historialTexto: historialTexto,
-                mensajeActual: mensaje
+                history: history,
+                current_message: mensaje
             });
         }
 
         // ================================
-        // 🔵 HTTP 2 → RESPUESTA DE LA IA
+        // 🔵 HTTP 2 → RESPUESTA IA
         // ================================
         if (respuestaIA) {
 
-            // evitar guardar cosas vacías o duplicadas
             if (respuestaIA && respuestaIA.trim() !== "") {
                 usuario.historial.push({
                     role: "bot",
@@ -106,13 +99,6 @@ app.post('/mensaje', async (req, res) => {
         console.log("❌ ERROR REAL:", error);
         return res.json({ error: "Error interno" });
     }
-});
-
-// iniciar servidor
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-    console.log("🚀 Servidor corriendo en puerto", PORT);
 });
 
 // iniciar servidor
