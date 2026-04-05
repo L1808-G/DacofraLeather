@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
-// 🧼 limpiar número (MUY IMPORTANTE)
+// 🧼 limpiar número
 function limpiarNumero(numero) {
     if (!numero) return "desconocido";
     return numero.toString().replace(/[^\d]/g, "");
@@ -35,7 +35,6 @@ app.post('/mensaje', async (req, res) => {
     try {
         console.log("📩 BODY:", req.body);
 
-        // 🔥 normalizar datos
         let numero = req.body.numero || req.body.from;
         const mensaje = req.body.mensaje || req.body.body;
         const respuestaIA = req.body.respuesta;
@@ -43,7 +42,7 @@ app.post('/mensaje', async (req, res) => {
         numero = limpiarNumero(numero);
 
         if (!numero) {
-            return res.send("Error: número no recibido");
+            return res.json({ error: "Número no recibido" });
         }
 
         let usuario = await User.findOne({ numero });
@@ -65,38 +64,22 @@ app.post('/mensaje', async (req, res) => {
 
             await usuario.save();
 
-            // 🧠 tomar últimos mensajes (contexto real)
+            // 🧠 construir historial como TEXTO
             const ultimos = usuario.historial.slice(-10);
 
-            let contexto = ultimos
+            let historialTexto = ultimos
                 .map(m => `${m.role === "user" ? "Cliente" : "Asesor"}: ${m.content}`)
                 .join("\n");
 
-            // fallback real
-            if (!contexto || contexto.trim() === "") {
-                contexto = "Cliente: Hola";
+            if (!historialTexto || historialTexto.trim() === "") {
+                historialTexto = "Cliente: Hola";
             }
 
-            // 🔥 RESPUESTA LIMPIA PARA IA
-            return res.send(`
-Eres Erick, asesor de ventas de productos de cuero premium.
-
-Hablas natural, cercano y profesional.
-
-IMPORTANTE:
-- Tienes memoria de la conversación
-- NO repitas preguntas ya respondidas
-- NO digas que no tienes información si sí la hay
-- Responde como si ya conocieras al cliente
-
----------------------
-HISTORIAL:
-${contexto}
----------------------
-
-MENSAJE ACTUAL:
-${mensaje}
-`);
+            // 🔥 devolver JSON (NO texto plano)
+            return res.json({
+                historialTexto: historialTexto,
+                mensajeActual: mensaje
+            });
         }
 
         // ================================
@@ -104,7 +87,7 @@ ${mensaje}
         // ================================
         if (respuestaIA) {
 
-            // 🔥 evitar guardar basura
+            // evitar guardar cosas vacías o duplicadas
             if (respuestaIA && respuestaIA.trim() !== "") {
                 usuario.historial.push({
                     role: "bot",
@@ -114,15 +97,22 @@ ${mensaje}
                 await usuario.save();
             }
 
-            return res.send("ok");
+            return res.json({ ok: true });
         }
 
-        return res.send("Sin datos válidos");
+        return res.json({ error: "Sin datos válidos" });
 
     } catch (error) {
         console.log("❌ ERROR REAL:", error);
-        return res.send("Error interno");
+        return res.json({ error: "Error interno" });
     }
+});
+
+// iniciar servidor
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log("🚀 Servidor corriendo en puerto", PORT);
 });
 
 // iniciar servidor
