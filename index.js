@@ -9,8 +9,10 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("🧠 Conectado a MongoDB"))
     .catch(err => console.log("❌ Error Mongo:", err));
 
+// 🔥 Schema con control de actividad
 const userSchema = new mongoose.Schema({
     numero: String,
+    lastActivity: { type: Date, default: Date.now }, // 👈 clave TTL
     historial: [
         {
             role: String,
@@ -19,6 +21,9 @@ const userSchema = new mongoose.Schema({
         }
     ]
 });
+
+// ⏳ TTL: eliminar usuario tras 7 días (604800 segundos)
+userSchema.index({ lastActivity: 1 }, { expireAfterSeconds: 604800 });
 
 const User = mongoose.model("User", userSchema);
 
@@ -39,18 +44,23 @@ app.post('/mensaje', async (req, res) => {
         let usuario = await User.findOne({ numero });
 
         if (!usuario) {
-            usuario = new User({ numero, historial: [] });
+            usuario = new User({ 
+                numero, 
+                historial: [],
+                lastActivity: new Date()
+            });
         }
 
-        // 🔵 PRIORIDAD: SI VIENE RESPUESTA IA → GUARDARLA
+        // 🔵 RESPUESTA IA
         if (respuestaIA !== undefined) {
 
-            // ❌ evitar guardar basura
             if (respuestaIA && respuestaIA.trim() !== "" && respuestaIA !== ".") {
                 usuario.historial.push({
                     role: "bot",
                     content: respuestaIA
                 });
+
+                usuario.lastActivity = new Date(); // 👈 actualizar actividad
 
                 await usuario.save();
                 console.log("✅ Guardado BOT:", respuestaIA);
@@ -68,6 +78,8 @@ app.post('/mensaje', async (req, res) => {
                 role: "user",
                 content: mensaje
             });
+
+            usuario.lastActivity = new Date(); // 👈 actualizar actividad
 
             await usuario.save();
 
@@ -92,13 +104,6 @@ app.post('/mensaje', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-    console.log("🚀 Servidor corriendo en puerto", PORT);
-});
-
-// iniciar servidor
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
