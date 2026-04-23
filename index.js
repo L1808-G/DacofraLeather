@@ -52,7 +52,7 @@ app.post('/mensaje', async (req, res) => {
         }
 
         // 🔵 RESPUESTA IA
-        if (respuestaIA !== undefined) {
+        if (respuestaIA && respuestaIA.trim() !== "" && respuestaIA !== ".") {
 
             if (respuestaIA && respuestaIA.trim() !== "" && respuestaIA !== ".") {
                 usuario.historial.push({
