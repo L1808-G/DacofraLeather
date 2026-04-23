@@ -9,10 +9,10 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("🧠 Conectado a MongoDB"))
     .catch(err => console.log("❌ Error Mongo:", err));
 
-// 🔥 Schema con control de actividad
+// 🔥 Schema ORIGINAL + campo para expiración
 const userSchema = new mongoose.Schema({
     numero: String,
-    lastActivity: { type: Date, default: Date.now }, // 👈 clave TTL
+    expireAt: { type: Date, default: () => new Date(Date.now() + 7*24*60*60*1000) }, // 👈 expira en 7 días
     historial: [
         {
             role: String,
@@ -22,8 +22,8 @@ const userSchema = new mongoose.Schema({
     ]
 });
 
-// ⏳ TTL: eliminar usuario tras 7 días (604800 segundos)
-userSchema.index({ lastActivity: 1 }, { expireAfterSeconds: 604800 });
+// ⏳ TTL automático
+userSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });
 
 const User = mongoose.model("User", userSchema);
 
@@ -39,25 +39,16 @@ app.post('/mensaje', async (req, res) => {
         let numero = limpiarNumero(req.body.numero || req.body.from);
 
         const mensaje = req.body.mensaje || req.body.body;
-        let respuestaIA = req.body.respuesta;
-
-            // 🔥 limpiar basura
-            if (respuestaIA && (respuestaIA.trim() === "" || respuestaIA.trim() === ".")) {
-                respuestaIA = null;
-            }
+        const respuestaIA = req.body.respuesta;
 
         let usuario = await User.findOne({ numero });
 
         if (!usuario) {
-            usuario = new User({ 
-                numero, 
-                historial: [],
-                lastActivity: new Date()
-            });
+            usuario = new User({ numero, historial: [] });
         }
 
-        // 🔵 RESPUESTA IA
-        if (respuestaIA && respuestaIA.trim() !== "" && respuestaIA !== ".") {
+        // 🔵 PRIORIDAD: SI VIENE RESPUESTA IA → GUARDARLA
+        if (respuestaIA !== undefined) {
 
             if (respuestaIA && respuestaIA.trim() !== "" && respuestaIA !== ".") {
                 usuario.historial.push({
@@ -65,7 +56,8 @@ app.post('/mensaje', async (req, res) => {
                     content: respuestaIA
                 });
 
-                usuario.lastActivity = new Date(); // 👈 actualizar actividad
+                // 🔥 reinicia expiración
+                usuario.expireAt = new Date(Date.now() + 7*24*60*60*1000);
 
                 await usuario.save();
                 console.log("✅ Guardado BOT:", respuestaIA);
@@ -84,7 +76,8 @@ app.post('/mensaje', async (req, res) => {
                 content: mensaje
             });
 
-            usuario.lastActivity = new Date(); // 👈 actualizar actividad
+            // 🔥 reinicia expiración
+            usuario.expireAt = new Date(Date.now() + 7*24*60*60*1000);
 
             await usuario.save();
 
