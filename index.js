@@ -39,7 +39,12 @@ app.post('/mensaje', async (req, res) => {
         let numero = limpiarNumero(req.body.numero || req.body.from);
 
         const mensaje = req.body.mensaje || req.body.body;
-        const respuestaIA = req.body.respuesta;
+        let respuestaIA = req.body.respuesta;
+
+            // 🔥 limpiar basura
+            if (respuestaIA && (respuestaIA.trim() === "" || respuestaIA.trim() === ".")) {
+                respuestaIA = null;
+            }
 
         let usuario = await User.findOne({ numero });
 
