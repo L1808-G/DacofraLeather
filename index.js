@@ -9,10 +9,13 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("🧠 Conectado a MongoDB"))
     .catch(err => console.log("❌ Error Mongo:", err));
 
-// 🔥 Schema ORIGINAL + campo para expiración
+// 🔥 Schema ORIGINAL + TTL
 const userSchema = new mongoose.Schema({
     numero: String,
-    expireAt: { type: Date, default: () => new Date(Date.now() + 7*24*60*60*1000) }, // 👈 expira en 7 días
+    expireAt: { 
+        type: Date, 
+        default: () => new Date(Date.now() + 7*24*60*60*1000) 
+    },
     historial: [
         {
             role: String,
@@ -47,28 +50,7 @@ app.post('/mensaje', async (req, res) => {
             usuario = new User({ numero, historial: [] });
         }
 
-        // 🔵 PRIORIDAD: SI VIENE RESPUESTA IA → GUARDARLA
-        if (respuestaIA !== undefined) {
-
-            if (respuestaIA && respuestaIA.trim() !== "" && respuestaIA !== ".") {
-                usuario.historial.push({
-                    role: "bot",
-                    content: respuestaIA
-                });
-
-                // 🔥 reinicia expiración
-                usuario.expireAt = new Date(Date.now() + 7*24*60*60*1000);
-
-                await usuario.save();
-                console.log("✅ Guardado BOT:", respuestaIA);
-            } else {
-                console.log("⚠️ Respuesta IA ignorada:", respuestaIA);
-            }
-
-            return res.json({ ok: true });
-        }
-
-        // 🟢 MENSAJE DEL USUARIO
+        // 🟢 PRIORIDAD: MENSAJE DEL USUARIO
         if (mensaje) {
 
             usuario.historial.push({
@@ -76,7 +58,6 @@ app.post('/mensaje', async (req, res) => {
                 content: mensaje
             });
 
-            // 🔥 reinicia expiración
             usuario.expireAt = new Date(Date.now() + 7*24*60*60*1000);
 
             await usuario.save();
@@ -92,6 +73,26 @@ app.post('/mensaje', async (req, res) => {
                 history: history,
                 current_message: mensaje
             });
+        }
+
+        // 🔵 RESPUESTA IA (secundario)
+        if (respuestaIA !== undefined) {
+
+            if (respuestaIA && respuestaIA.trim() !== "" && respuestaIA !== ".") {
+                usuario.historial.push({
+                    role: "bot",
+                    content: respuestaIA
+                });
+
+                usuario.expireAt = new Date(Date.now() + 7*24*60*60*1000);
+
+                await usuario.save();
+                console.log("✅ Guardado BOT:", respuestaIA);
+            } else {
+                console.log("⚠️ Respuesta IA ignorada:", respuestaIA);
+            }
+
+            return res.json({ ok: true });
         }
 
         return res.json({ error: "Sin datos válidos" });
